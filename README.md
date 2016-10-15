@@ -1,6 +1,6 @@
 # Pull Files using Powershell
 
-I needed a simple automated method of pulling log files from around 1000 devices each night. Feel free to use it as a template or reference for your own project. It had to download roughly 20 MB of log files a day. It utilizes the Invoke-Parallel cmdlet for Runspaces to speed up the process.
+I wrote a simple automated script to pull log files from around 1000 devices each night. Feel free to use it as a template or reference for your own project. It had to download roughly 20 MB of log files a day. It utilizes the Invoke-Parallel cmdlet for Runspaces to speed up the process.
 
 Some notes for why I did things this way include:
 
