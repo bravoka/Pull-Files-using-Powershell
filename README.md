@@ -4,7 +4,7 @@ I needed a simple automated method of pulling log files from around 1000 devices
 
 Some notes for why I did things this way include:
 
-Our production DNS server was missing half the entries, and many were incorrect. Still waiting for someone to update it. I'd love to go in and fix it, but I dont have access as I'm not an admin :( 
+Our production DNS server was missing half the entries, and many were incorrect. Still waiting for someone to update it. I'd love to go in and fix it, but non-administrators don't have access :( 
 
 I manually created a CSV file that linked Computer Name with IP addresses, as well as other information so that I can re-use this CSV for other functions in the future.
 
