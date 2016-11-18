@@ -17,3 +17,7 @@ I manually created a CSV file that linked Computer Name with IP addresses, as we
 All production devices shared the same C$ password, so I conveniently used that.
 
 I needed a logfile showing which devices it tried but failed to pull logs from. 
+
+17 November 2016 Update:
+------------------------
+- Added retries in each loop in case of connection interruption due to less than perfect network
