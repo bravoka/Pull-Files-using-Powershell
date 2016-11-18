@@ -392,35 +392,48 @@ $Parameters = @{storage = $storage; password = $password}
 function pullFromPrimary {
 
     $csv1 | Invoke-Parallel -Throttle 15 -Parameter $Parameters -Logfile $parallelLog -ScriptBlock {
+        $retry = $true
+        $retriesleft = 3
+        do {
+            Try 
+            {
+                ## Copy all files where date = currentdate - 1 day (Files created yesterday) ##
+                $n = $_
+                $ErrorActionPreference = "Stop"
+                net use ("\\" + $_.IPAddress) /user:Administrator $Parameter.password | Out-Null; 
+                Get-ChildItem -Path ("\\" + $_.IPAddress + "\C$\Program Files\Example\Logs") | where-object -FilterScript {$_.creationtime.ToShortDateString() -eq (get-date).AddDays(-1).ToShortDateString()} | copy-item -destination ($Parameter.storage + "\" + $_.Type + "\" + $_.DeviceName);
+                $retry = $false
+	    
+            }
+            
+            Catch
+            {
+	        If ($retriesleft -lt 1)
+	        {
+                ## Avoid multiple threads writing to the Exception file at the same time ##
+            	    $mutex = New-Object System.Threading.Mutex($false,'mutexlog')
+            	    [void]$mutex.WaitOne()
+            	    "[" + (Get-Date) + "] Failed retrieving logs from: " + $n.DeviceName + " on " + $n.IPAddress | Out-File ($Parameter.storage + "\" + (Get-Date).ToString("yyyy.MM.dd") + "_Exceptions.txt") -append   
+            	    $mutex.ReleaseMutex()
+            	    $mutex.Dispose() 
+		    $retry = $false
+                }
+	        Else
+	        {
+	    	    $retriesleft -= 1
+		    Start-Sleep 15
+	        }    
+            }
+            
+            Finally
+            {
 
-        Try 
-        {
-            ## Copy all files where date = currentdate - 1 day (Files created yesterday) ##
-            $n = $_
-            $ErrorActionPreference = "Stop"
-            net use ("\\" + $_.IPAddress) /user:Administrator $Parameter.password | Out-Null; 
-            Get-ChildItem -Path ("\\" + $_.IPAddress + "\C$\Program Files\Example\Logs") | where-object -FilterScript {$_.creationtime.ToShortDateString() -eq (get-date).AddDays(-1).ToShortDateString()} | copy-item -destination ($Parameter.storage + "\" + $_.Type + "\" + $_.DeviceName);
-            net use ("\\" + $_.IPAddress) /delete
+                $ErrorActionPreference = "Continue"
             
-        }
-            
-        Catch
-        {
-            ## Avoid multiple threads writing to the Exception file at the same time ##
-            $mutex = New-Object System.Threading.Mutex($false,'mutexlog')
-            [void]$mutex.WaitOne()
-            "[" + (Get-Date) + "] Failed retrieving logs from: " + $n.DeviceName + " on " + $n.IPAddress | Out-File ($Parameter.storage + "\" + (Get-Date).ToString("yyyy.MM.dd") + "_Exceptions.txt") -append   
-            $mutex.ReleaseMutex()
-            $mutex.Dispose()  
-            
-        }
-            
-        Finally
-        {
-
-            $ErrorActionPreference = "Continue"
-            
-        }        
+            }
+	}
+	While ($retry -eq $true)
+	net use ("\\" + $_.IPAddress) /delete
     }
 }
 
@@ -430,38 +443,54 @@ function pullFromPrimary {
 function pullFromSecondary {
 
     $csv2 | Invoke-Parallel -Throttle 15 -Parameter $Parameters -Logfile $parallelLog -ScriptBlock {
-
-        Try
-        {
+        $retry = $true
+        $retriesleft = 3
+        Do {
+	 
+            Try
+            {
             
-            ## Copy all files where date = currentdate - 1 day (Files created yesterday) ##
-            $n = $_
-            $ErrorActionPreference = "Stop"
-            net use ("\\" + $_.IPAddress) /user:Administrator $Parameters.password | Out-Null;
-            Get-Childitem ("\\" + $_.IPAddress + "\C$\POS\Logs") | where-object {$_.creationtime.ToShortDateString() -eq (get-date).AddDays(-1).ToShortDateString()} | copy-item -destination ($Parameter.storage + "\POS\" + $_.DeviceName + "\POS\Logs\");
+                ## Copy all files where date = currentdate - 1 day (Files created yesterday) ##
+                $n = $_
+                $ErrorActionPreference = "Stop"
+                net use ("\\" + $_.IPAddress) /user:Administrator $Parameters.password | Out-Null;
+                Get-Childitem ("\\" + $_.IPAddress + "\C$\POS\Logs") | where-object {$_.creationtime.ToShortDateString() -eq (get-date).AddDays(-1).ToShortDateString()} | copy-item -destination ($Parameter.storage + "\POS\" + $_.DeviceName + "\POS\Logs\");
 	        Get-Childitem ("\\" + $_.IPAddress + "\C$\Program Files\POS\Logs") | where-object {$_.creationtime.ToShortDateString() -eq (get-date).AddDays(-1).ToShortDateString()} | copy-item -destination ($Parameter.storage + "\TVM\" + $_.DeviceName + "\Program Files\POS\Logs");
 	        Get-Childitem ("\\" + $_.IPAddress + "\C$\BankSoftware\Log") | where-object {$_.creationtime.ToShortDateString() -eq (get-date).AddDays(-1).ToShortDateString()} | copy-item -destination ($Parameter.storage + "\POS\" + $_.DeviceName + "\BankSoftware\Log");
-            net use ("\\" + $_.IPAddress) /delete
+                $retry = $false
 
-        }
+            }
 
-        Catch
-        {
-            ## Avoid multiple threads writing to the Exception file at the same time ##
-            $mutex = New-Object System.Threading.Mutex($false,'mutexlog')
-            [void]$mutex.waitOne()
-            "[" + (Get-Date) + "] Failed retrieving logs from: " + $n.IPAddress + " (" + $n.DeviceName + ")." | Out-File ($Parameter.storage + "\" + (Get-Date).ToString("yyyy.MM.dd") + "_Exceptions.txt") -append
-            $mutex.ReleaseMutex()
-            $mutex.Dispose()
+            Catch
+            {
+	        If ($retriesleft -lt 1)
+	        {
+                    ## Avoid multiple threads writing to the Exception file at the same time ##
+                    $mutex = New-Object System.Threading.Mutex($false,'mutexlog')
+                    [void]$mutex.waitOne()
+                    "[" + (Get-Date) + "] Failed retrieving logs from: " + $n.IPAddress + " (" + $n.DeviceName + ")." | Out-File ($Parameter.storage + "\" + (Get-Date).ToString("yyyy.MM.dd") + "_Exceptions.txt") -append
+                    $mutex.ReleaseMutex()
+                    $mutex.Dispose()
+	            $retry = $false
+		}
+	        Else
+	        {
+	    
+	            $retriesleft -= 1
+		    Start-Sleep 15
+		
+	        }
+            }
 
-        }
+            Finally
+            {
 
-        Finally
-        {
+                $ErrorActionPreference = "Continue"
 
-            $ErrorActionPreference = "Continue"
-
-        }         
+            }
+	}
+	While ($retry -eq $true)
+	net use ("\\" + $_.IPAddress) /delete
     }
 }
 
